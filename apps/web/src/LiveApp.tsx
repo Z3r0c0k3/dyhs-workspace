@@ -7,6 +7,7 @@ import { LiveMail } from './LiveMail';
 
 type Me = {
   displayName: string; email: string | null; subject: string; mailbox: string | null; csrfToken: string; permissions: string[];
+  mailAutoConnect: boolean; mailConnection: { state: string; address: string | null; message?: string };
   capabilities: { mail: boolean; mailSend: boolean; calendar: boolean; identity: boolean; identityWrites: boolean };
   security: { password: string | null; passkey: string | null; mfa: string | null; advanced: string }; adminUrl: string;
 };
@@ -16,6 +17,7 @@ function Logo() { return <span className="make-logo"><span className="make-crop"
 export function LiveApp() {
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState('');
   const [page, setPage] = useState(location.hash.slice(2) || 'home');
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('dyhs-theme') === 'dark' ? 'dark' : 'light'; } catch { return 'light'; } });
@@ -31,6 +33,15 @@ export function LiveApp() {
     document.documentElement.dataset.theme = theme;
     try { localStorage.setItem('dyhs-theme', theme); } catch { /* Theme still applies for this visit. */ }
   }, [theme]);
+  async function connectMail() {
+    if (!me || connecting) return;
+    setConnecting(true); setError('');
+    try {
+      await api('/api/mail/connect', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': me.csrfToken }, body: '{}' });
+      setMe(await api('/api/me'));
+    } catch (reason) { setError((reason as Error).message); }
+    finally { setConnecting(false); }
+  }
   async function logout() {
     if (!me) return;
     try {
@@ -48,9 +59,9 @@ export function LiveApp() {
     <nav className="live-nav" aria-label="제품 탐색">{navigation.map(([id, label, icon]) => <a key={id} href={`#/${id}`} className={page === id ? 'active' : ''} aria-current={page === id ? 'page' : undefined}><Icon name={icon} size={18} />{label}</a>)}<a href={services.url} target="_blank" rel="noopener noreferrer">Dyhs URL ↗</a></nav>
     <main id="main" tabIndex={-1} className="live-main">
       {error && <p className="notice" role="alert">{error}</p>}
-      {page === 'home' && <><div className="page-heading"><div><span className="eyebrow">YOUR DAY, ALL TOGETHER</span><h1>반가워요, {me.displayName}님.</h1><p>필요한 서비스와 계정 설정을 한곳에서 확인하세요.</p></div><span className="badge">Dyhs Auth 연결됨</span></div><section className="welcome-card"><div><span className="hero-label">나의 일상이 이어지는 곳</span><h2>작은 일부터, 큰 아이디어까지.<br />이제 하나의 Workspace에서.</h2><p>메일과 계정, 필요한 도구를 더 가까이.</p><a className="hero-button" href={services.mail} target="_blank" rel="noopener noreferrer">Dyhs Mail 열기 ↗</a></div></section><div className="live-cards"><section className="panel"><Icon name="shield" /><h2>내 계정</h2><p>{me.email || '확인된 이메일 없음'}</p><a className="secondary" href="#/settings">계정 및 보안</a></section><section className="panel"><Icon name="mail" /><h2>메일·캘린더</h2><p>Workspace 메일 연결을 준비 중입니다. 기존 Dyhs Mail을 계속 이용할 수 있습니다.</p><a className="secondary" href={services.mail} target="_blank" rel="noopener noreferrer">기존 메일 서비스 ↗</a></section></div></>}
-      {page === 'mail' && (me.capabilities.mail ? <LiveMail me={me} /> : <section className="panel live-empty"><Icon name="mail" size={32} /><h1>메일함 연결 대기</h1><p>본인 메일함의 접근 권한을 확인한 뒤 Workspace에서 사용할 수 있습니다.</p><a className="primary" href={services.mail} target="_blank" rel="noopener noreferrer">Dyhs Mail 열기 ↗</a></section>)}
-      {page.startsWith('settings') && <><div className="page-heading"><div><span className="eyebrow">ACCOUNT & SECURITY</span><h1>계정 및 보안</h1><p>보안 설정은 Dyhs Auth에서 본인 인증 후 적용합니다.</p></div></div><section className="panel settings-panel"><div className="profile-summary"><span className="avatar large">{me.displayName.slice(0, 1)}</span><div><h2>{me.displayName}</h2><p>{me.email || '확인된 이메일 없음'}</p></div></div>{([['passkey', '패스키', '패스키 관리'], ['mfa', '2단계 인증 (2FA)', '2FA 설정'], ['password', '비밀번호', '비밀번호 변경']] as const).map(([key, label, action]) => <div className="setting-row security-action" key={key}><div><strong>{label}</strong><p>{me.security[key] ? 'Dyhs Auth의 본인 설정 화면으로 이동합니다.' : '설정 경로 연결 대기 · 고급 설정에서 관리할 수 있습니다.'}</p></div>{me.security[key] ? <a className="secondary" href={me.security[key]!}>{action} ↗</a> : <button className="secondary" disabled>{action}</button>}</div>)}<div className="advanced-settings"><div><h3>더 자세한 계정 설정</h3><p>프로필, 로그인 세션과 기타 기능을 관리합니다.</p></div><a className="secondary" href={me.security.advanced}>Dyhs Auth 고급 설정 ↗</a></div><details className="live-identity"><summary>계정 연결 식별자</summary><p>관리자가 메일함과 권한을 연결할 때 사용하는 본인 식별자입니다.</p><code>{me.subject}</code></details></section></>}
+      {page === 'home' && <><div className="page-heading"><div><span className="eyebrow">YOUR DAY, ALL TOGETHER</span><h1>반가워요, {me.displayName}님.</h1><p>필요한 서비스와 계정 설정을 한곳에서 확인하세요.</p></div><span className="badge">Dyhs Auth 연결됨</span></div><section className="welcome-card"><div><span className="hero-label">나의 일상이 이어지는 곳</span><h2>작은 일부터, 큰 아이디어까지.<br />이제 하나의 Workspace에서.</h2><p>메일과 계정, 필요한 도구를 더 가까이.</p><a className="hero-button" href="#/mail">내 메일함 열기</a></div></section><div className="live-cards"><section className="panel"><Icon name="shield" /><h2>내 계정</h2><p>{me.email || '확인된 이메일 없음'}</p><a className="secondary" href="#/settings">계정 및 보안</a></section><section className="panel"><Icon name="mail" /><h2>내 메일</h2><p>{me.capabilities.mail ? `${me.mailbox} · 메일함 연결됨` : me.mailConnection?.message || '메일함 연결을 확인해 주세요.'}</p><a className="secondary" href="#/mail">메일함 열기</a></section></div></>}
+      {page === 'mail' && (me.capabilities.mail ? <LiveMail me={me} /> : <section className="panel live-empty"><Icon name="mail" size={32} /><h1>메일함 연결 확인</h1><p>{me.mailConnection?.message || '운영자의 메일 연결 설정이 필요합니다.'}</p>{me.mailAutoConnect && <button className="primary" disabled={connecting} onClick={connectMail}>{connecting ? '연결 중…' : '메일함 다시 연결'}</button>}<p className="muted">로그인한 계정의 메일함을 자동으로 연결합니다. 별도의 메일 비밀번호는 필요하지 않습니다.</p></section>)}
+      {page.startsWith('settings') && <><div className="page-heading"><div><span className="eyebrow">ACCOUNT & SECURITY</span><h1>계정 및 보안</h1><p>보안 설정은 Dyhs Auth에서 본인 인증 후 적용합니다.</p></div></div><section className="panel settings-panel"><div className="profile-summary"><span className="avatar large">{me.displayName.slice(0, 1)}</span><div><h2>{me.displayName}</h2><p>{me.email || '확인된 이메일 없음'}</p></div></div>{([['passkey', '패스키', '패스키 관리'], ['mfa', '2단계 인증 (2FA)', '2FA 설정'], ['password', '비밀번호', '비밀번호 변경']] as const).map(([key, label, action]) => <div className="setting-row security-action" key={key}><div><strong>{label}</strong><p>{me.security[key] ? 'Dyhs Auth의 본인 설정 화면으로 이동합니다.' : '설정 경로 연결 대기 · 고급 설정에서 관리할 수 있습니다.'}</p></div>{me.security[key] ? <a className="secondary" href={me.security[key]!}>{action} ↗</a> : <button className="secondary" disabled>{action}</button>}</div>)}<div className="advanced-settings"><div><h3>더 자세한 계정 설정</h3><p>프로필, 로그인 세션과 기타 기능을 관리합니다.</p></div><a className="secondary" href={me.security.advanced}>Dyhs Auth 고급 설정 ↗</a></div><details className="live-identity"><summary>계정 연결 식별자</summary><p>계정 연결 확인과 관리 권한 설정에 사용하는 본인 식별자입니다.</p><code>{me.subject}</code></details></section></>}
       {page === 'admin' && (canAdmin ? <LiveAdmin me={me} /> : <section className="panel live-empty"><h1>관리 권한이 필요합니다</h1><p>운영자에게 접근 권한을 요청해 주세요.</p></section>)}
       {!['home', 'mail', 'admin'].includes(page) && !page.startsWith('settings') && <section className="panel live-empty"><h1>페이지를 찾을 수 없습니다</h1><a href="#/home">홈으로 돌아가기</a></section>}
       <footer className="page-footer"><div className="school-identity"><span className="school-logo"><img src="/brand/deokyeong-original.jpg" width="1000" height="1000" alt="덕영고등학교 · Dreams of Youth" /></span><div><strong>덕영고 구성원을 위한 작업 공간</strong><span>운영 · MAKE;</span><small>학교 공식 서비스가 아닙니다.</small></div></div></footer>

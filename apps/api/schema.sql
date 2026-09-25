@@ -23,3 +23,14 @@ CREATE TABLE IF NOT EXISTS workspace_admin_operations (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS workspace_operations_actor ON workspace_admin_operations(issuer, subject, created_at);
+
+CREATE TABLE IF NOT EXISTS workspace_mail_bindings (
+  issuer text NOT NULL,
+  subject text NOT NULL,
+  mailbox text NOT NULL UNIQUE,
+  ciphertext text NOT NULL,
+  app_name text NOT NULL UNIQUE,
+  app_id text,
+  state text NOT NULL CHECK (state IN ('pending', 'creating', 'active', 'revoked')),
+  PRIMARY KEY (issuer, subject)
+);

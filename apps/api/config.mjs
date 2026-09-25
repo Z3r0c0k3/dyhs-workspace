@@ -44,9 +44,9 @@ export function loadConfig(env = process.env) {
   const port = Number(env.PORT || 8080);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid PORT');
   let mail = null;
-  if (env.MAIL_ACCESS_MODE && env.MAIL_ACCESS_MODE !== 'app-password') throw new Error('Only explicitly configured app-password mail access is supported');
-  if (env.MAIL_ACCESS_MODE === 'app-password') {
-    const accounts = JSON.parse(readFileSync(required(env, 'MAIL_ACCOUNTS_PATH'), 'utf8'));
+  if (env.MAIL_ACCESS_MODE && !['app-password', 'sso-auto'].includes(env.MAIL_ACCESS_MODE)) throw new Error('Unsupported MAIL_ACCESS_MODE');
+  if (env.MAIL_ACCESS_MODE) {
+    const accounts = env.MAIL_ACCESS_MODE === 'app-password' ? JSON.parse(readFileSync(required(env, 'MAIL_ACCOUNTS_PATH'), 'utf8')) : [];
     if (!Array.isArray(accounts)) throw new Error('Mail accounts must be an array');
     const subs = new Set(), addresses = new Set();
     for (const account of accounts) {
@@ -57,7 +57,15 @@ export function loadConfig(env = process.env) {
     if (!/^[a-zA-Z0-9.-]+$/.test(host)) throw new Error('MAIL_HOST must be a TLS hostname');
     const idSecret = required(env, 'MAIL_ID_SECRET');
     if (!/^[a-f0-9]{64}$/i.test(idSecret)) throw new Error('MAIL_ID_SECRET must be 32 random bytes encoded as hex');
-    mail = { accounts, host, idSecret, writes: env.MAIL_ENABLE_SEND === 'true' };
+    mail = { mode: env.MAIL_ACCESS_MODE, accounts, host, idSecret, writes: env.MAIL_ACCESS_MODE === 'sso-auto' ? env.MAIL_ENABLE_SEND !== 'false' : env.MAIL_ENABLE_SEND === 'true' };
+    if (mail.mode === 'sso-auto') {
+      const apiUrl = https(required(env, 'MAILCOW_API_URL'), 'MAILCOW_API_URL', true);
+      const credentialKey = required(env, 'MAIL_CREDENTIAL_KEY');
+      if (!/^[a-f0-9]{64}$/i.test(credentialKey)) throw new Error('MAIL_CREDENTIAL_KEY must be 32 random bytes encoded as hex');
+      const domains = required(env, 'MAIL_ALLOWED_DOMAINS').toLowerCase().split(',').map(value => value.trim());
+      if (domains.some(domain => !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/.test(domain))) throw new Error('Invalid MAIL_ALLOWED_DOMAINS');
+      mail.auto = { apiUrl, credentialKey, domains, apiKey: required(env, 'MAILCOW_API_KEY') };
+    }
   }
   return {
     publicUrl, issuer, authOrigin, policy, flows, userPath, groupIds, port, mail,

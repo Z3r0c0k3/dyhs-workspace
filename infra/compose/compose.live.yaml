@@ -28,7 +28,11 @@ services:
       MAIL_ACCOUNTS_PATH: /run/secrets/mailboxes.json
       MAIL_HOST: ${MAIL_HOST:-mail.dyhs.kr}
       MAIL_ID_SECRET: ${MAIL_ID_SECRET:-}
-      MAIL_ENABLE_SEND: ${MAIL_ENABLE_SEND:-false}
+      MAIL_ENABLE_SEND: ${MAIL_ENABLE_SEND:-true}
+      MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.dyhs.kr}
+      MAILCOW_API_KEY: ${MAILCOW_API_KEY:-}
+      MAIL_CREDENTIAL_KEY: ${MAIL_CREDENTIAL_KEY:-}
+      MAIL_ALLOWED_DOMAINS: ${MAIL_ALLOWED_DOMAINS:-}
     volumes:
       - ../secrets/roles.json:/run/secrets/roles.json:ro
       - ../secrets/mailboxes.json:/run/secrets/mailboxes.json:ro

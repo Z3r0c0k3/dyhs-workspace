@@ -5,6 +5,7 @@ import { once } from 'node:events';
 import { Store, digest } from '../../apps/api/store.mjs';
 import { connectOidc } from '../../apps/api/oidc.mjs';
 import { createApp } from '../../apps/api/server.mjs';
+import { createAutoMail } from '../../apps/api/auto-mail.mjs';
 import { createIdentity } from '../../apps/api/identity.mjs';
 import { validatePolicy } from '../../apps/api/config.mjs';
 
@@ -13,11 +14,12 @@ test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', a
   const store = new Store(process.env.TEST_DATABASE_URL);
   await store.init();
   // Explicit opt-in database only; never read production DATABASE_URL in tests.
-  await store.pool.query('TRUNCATE workspace_auth_transactions, workspace_sessions, workspace_admin_operations');
+  await store.pool.query('TRUNCATE workspace_auth_transactions, workspace_sessions, workspace_admin_operations, workspace_mail_bindings');
   t.after(() => store.close());
   const config = {
     issuer: 'https://auth.example/application/o/workspace/', authOrigin: 'https://auth.example',
     publicUrl: 'https://workspace.example', redirectUri: 'https://workspace.example/auth/callback',
+    mail: { mode: 'sso-auto', accounts: [], host: 'mail.workspace.example', idSecret: 'a'.repeat(64), writes: true, auto: { apiUrl: 'https://mail.workspace.example', apiKey: 'mailcow-test-key', credentialKey: 'b'.repeat(64), domains: ['workspace.example'] } },
     clientId: 'test-client', clientSecret: 'test-client-secret', sessionSeconds: 900,
     apiToken: 'test-api-token', userPath: 'workspace', groupIds: [], adminWrites: true, flows: { password: null, passkey: null, mfa: null },
     policy: validatePolicy({ subjects: [{ sub: 'admin-sub', permissions: ['identity.users.read', 'identity.users.create', 'identity.groups.read', 'identity.groups.create'] }] }),
@@ -41,7 +43,7 @@ test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', a
     assert.ok(record);
     assert.equal(createHash('sha256').update(body.get('code_verifier')).digest('base64url'), record.params.get('code_challenge'));
     const now = Math.floor(Date.now() / 1000);
-    const claims = { iss: config.issuer, aud: config.clientId, sub: record.sub || 'admin-sub', iat: now, exp: now + 300, auth_time: now, nonce: record.params.get('nonce'), name: '테스트 사용자', email: 'member@workspace.example', email_verified: true, groups: ['admin'], ...record.claims };
+    const claims = { iss: config.issuer, aud: config.clientId, sub: record.sub || 'admin-sub', iat: now, exp: now + 300, auth_time: now, nonce: record.params.get('nonce'), name: '테스트 사용자', email: 'member@workspace.example', email_verified: true, workspace_mailbox: 'member@workspace.example', groups: ['admin'], ...record.claims };
     const payload = `${b64({ alg: 'RS256', kid: 'test-key' })}.${b64(claims)}`;
     const token = `${payload}.${sign('RSA-SHA256', Buffer.from(payload), record.badSignature ? wrongKey : privateKey).toString('base64url')}`;
     return Response.json({ token_type: 'Bearer', access_token: 'test-access-token', expires_in: 300, id_token: token });
@@ -65,7 +67,18 @@ test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', a
       { pk: 4, name: 'Service', path: 'workspace', type: 'service_account', is_superuser: false },
     ], pagination: { next: 0 } });
   });
-  const app = createApp({ config, store, oidc, identity });
+  const apps = []; let mailcowCalls = 0, issued = 0;
+  const autoMail = createAutoMail(config, store, async (url, init) => {
+    mailcowCalls++;
+    assert.equal(init.headers['X-API-Key'], 'mailcow-test-key');
+    if (init.method === 'POST') {
+      issued++; const body = JSON.parse(init.body);
+      apps.push({ id: '1', name: body.app_name, mailbox: body.username, active: 1, imap_access: 1, smtp_access: 1 });
+      return Response.json([{ type: 'success', msg: 'app_passwd_added' }]);
+    }
+    return Response.json(url.includes('/get/mailbox/') ? { username: 'member@workspace.example', active: 1 } : apps);
+  });
+  const app = createApp({ config, store, oidc, identity, autoMail });
   const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(() => new Promise(resolve => server.close(resolve)));
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -73,6 +86,7 @@ test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', a
   async function start(record = {}) {
     const response = await request('/auth/login', { headers: { Host: 'attacker.example', 'X-Forwarded-Host': 'attacker.example' } });
     const params = new URL(response.headers.get('location')).searchParams;
+    assert.match(params.get('scope'), /workspace_mail/);
     assert.equal(params.get('redirect_uri'), config.redirectUri); assert.equal(params.get('code_challenge_method'), 'S256');
     const code = randomUUID(); authorization.set(code, { params, ...record });
     return { cookie: response.headers.getSetCookie()[0].split(';')[0], path: `/auth/callback?code=${code}&state=${params.get('state')}` };
@@ -94,18 +108,22 @@ test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', a
     assert.match(response.headers.get('location'), /login_failed/, JSON.stringify(record));
     assert.ok(!response.headers.getSetCookie().some(value => value.startsWith('__Host-dyhs_session=')));
   }
-  const success = await login(); assert.equal(success.headers.get('location'), '/');
+  assert.equal(mailcowCalls, 0, 'Unverified ID tokens cannot call Mailcow');
+  const success = await login(); assert.equal(success.headers.get('location'), '/#/mail');
+  assert.equal(issued, 1);
   const sessionHeader = success.headers.getSetCookie().find(value => value.startsWith('__Host-dyhs_session='));
   assert.match(sessionHeader, /HttpOnly/); assert.match(sessionHeader, /Secure/); assert.match(sessionHeader, /SameSite=Lax/); assert.doesNotMatch(sessionHeader, /Domain=/);
   const session = sessionHeader.split(';')[0]; const sessionId = session.split('=')[1];
   const me = await (await request('/api/me', { headers: { Cookie: session } })).json();
-  assert.equal(me.mailbox, null); assert.equal(me.displayName, '테스트 사용자'); assert.ok(me.permissions.includes('identity.users.read'));
-  assert.doesNotMatch(JSON.stringify(me), /test-access-token|test-client-secret|test-api-token/);
+  assert.equal(me.mailbox, 'member@workspace.example'); assert.equal(me.mailConnection.state, 'active'); assert.equal(me.capabilities.mailSend, true); assert.equal(me.displayName, '테스트 사용자'); assert.ok(me.permissions.includes('identity.users.read'));
+  assert.doesNotMatch(JSON.stringify(me), /test-access-token|test-client-secret|test-api-token|mailcow-test-key|ciphertext|app_passwd/);
   const dbRow = (await store.pool.query('SELECT id FROM workspace_sessions')).rows[0];
   assert.equal(dbRow.id, digest(sessionId)); assert.notEqual(dbRow.id, sessionId);
   const secondStore = new Store(process.env.TEST_DATABASE_URL);
   assert.equal((await secondStore.session(sessionId)).sub, 'admin-sub'); await secondStore.close();
   const userSession = (await login({ sub: 'different-sub-same-email' })).headers.getSetCookie().find(value => value.startsWith('__Host-dyhs_session=')).split(';')[0];
+  assert.equal((await (await request('/api/me', { headers: { Cookie: userSession } })).json()).capabilities.mail, false);
+  assert.equal(issued, 1, 'Another subject cannot take the same mailbox');
   const calls = upstream.length;
   assert.equal((await request('/api/admin/users', { headers: { Cookie: userSession, 'X-Role': 'platform_admin' } })).status, 403);
   assert.equal(upstream.length, calls);
@@ -113,6 +131,9 @@ test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', a
   const users = await (await request('/api/admin/users', { headers: { Cookie: session } })).json();
   assert.equal(users.items.length, 1); assert.equal(users.hasNext, false); assert.doesNotMatch(JSON.stringify(users), /must-not-leak|Privileged|Service/);
   const write = (path, body, headers = {}) => request(path, { method: 'POST', headers: { Cookie: session, Origin: config.publicUrl, 'Content-Type': 'application/json', 'X-CSRF-Token': me.csrfToken, 'Idempotency-Key': randomUUID(), ...headers }, body: JSON.stringify(body) });
+  assert.equal((await write('/api/mail/connect', { address: 'other@workspace.example' })).status, 400);
+  assert.equal((await write('/api/mail/connect', {}, { 'X-CSRF-Token': 'wrong' })).status, 403);
+  assert.equal((await write('/api/mail/connect', {})).status, 200); assert.equal(issued, 1);
   assert.equal((await write('/api/logout', {}, { Origin: 'https://attacker.example' })).status, 403);
   assert.equal((await write('/api/logout', {}, { 'X-CSRF-Token': 'wrong' })).status, 403);
   assert.equal((await write('/api/admin/users', { username: 'new', name: '새 사용자', email: 'new@workspace.example', is_superuser: true })).status, 400);

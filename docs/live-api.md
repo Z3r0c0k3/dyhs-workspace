@@ -1,18 +1,19 @@
 # 현재 Live API
 
-2026-09-25 구현 기준. 기존 `openapi.yaml`은 전체 목표의 초기 초안이며, 아래가 현재 구현한 경로입니다. 브라우저가 보내는 역할/메일 주소로 세션 주체나 메일함을 선택하지 않습니다.
+2026-09-26 구현 기준. 기존 `openapi.yaml`은 전체 목표의 초기 초안이며, 아래가 현재 구현한 경로입니다. 브라우저가 보내는 역할/메일 주소로 세션 주체나 메일함을 선택하지 않습니다.
 
 | 경로 | 처리 |
 | --- | --- |
 | `GET /healthz` | DB 확인, `{status:"ok", mode:"live"}` |
 | `GET /auth/login` | 10분 일회용 OIDC transaction, PKCE/state/nonce 생성 |
-| `GET /auth/callback` | OIDC 검증 후 15분 고정 서버 세션 발급. 실패 시 `/?auth_error=login_failed` |
-| `GET /api/me` | 본인 `id,subject,displayName,email,mailbox,roles,permissions,csrfToken,sessionSeconds,capabilities,security,adminUrl` |
+| `GET /auth/callback` | OIDC 검증 후 자동 메일 연결, 15분 고정 서버 세션 발급. 자동 연결 모드는 `/#/mail`로 이동. 메일 연결 실패는 로그인 실패로 처리하지 않음. 실패 시 `/?auth_error=login_failed` |
+| `GET /api/me` | 본인 `id,subject,displayName,email,mailbox,mailConnection,mailAutoConnect,roles,permissions,csrfToken,sessionSeconds,capabilities,security,adminUrl` |
 | `POST /api/logout` | Workspace 세션 및 진행 중인 로그인 transaction 폐기 |
 | `GET /api/admin/users?page=1` | 허용 경로의 일반 사용자, `{items,page,hasNext}` |
 | `POST /api/admin/users` | `{username,name,email}`로 비활성 일반 계정 생성 |
 | `GET /api/admin/groups?page=1` | 허용 일반 그룹, `{items,page,hasNext}` |
 | `POST /api/admin/groups` | `{name}`으로 구성원 없는 일반 그룹 생성 |
+| `POST /api/mail/connect` | 빈 `{}` 본문. 서명된 SSO claim의 본인 메일함 연결/재확인, `{state,address,message?}` 반환. 주소·비밀번호 입력 거부 |
 | `GET /api/mail/folders` | `{id,name,specialUse,unread}[]` |
 | `GET /api/mail/messages?folder=INBOX&query=&cursor=` | `{items,nextCursor}`, 최대 50개. summary의 `from`은 표시 문자열 |
 | `GET /api/mail/messages/:id` | `{id,subject,from,to,cc,text,attachments}`, 주소 필드는 문자열 배열 |
@@ -30,3 +31,7 @@
 메일 ID와 cursor는 세션 identity·메일함·폴더·UIDVALIDITY·UID에 묶인 HMAC ID입니다. ID를 다른 사용자가 재사용하면 404, UIDVALIDITY 변경은 409입니다. `email_verified`는 이메일 표시만 결정하며 메일함 매핑에는 관여하지 않습니다.
 
 JSON 오류는 `{code,message,requestId}`이며 세션 없음/만료 401, 권한·CSRF 오류 403, 없는 항목 404, 충돌 409, 크기 초과 413, 요청 제한 429, upstream 오류 502, 미설정/비활성 503을 사용합니다. upstream의 비밀/응답 본문은 중계하지 않습니다.
+
+`mailAutoConnect`는 자동 연결 모드 여부입니다. `mailConnection`은 `{state,address,message?}`이며 상태는 `pending`, `creating`, `active`, `revoked`, `blocked`, `unconfigured`입니다. 활성 연결에만 address와 mail/mailSend capability를 제공합니다. 서버 설정 및 서명된 `workspace_mailbox` claim으로만 대상을 결정하며 claim 자체나 암호화된 비밀번호를 API에 반환하지 않습니다.
+
+자동 연결은 `workspace_mail` scope를 요청합니다. Mailcow 요청은 `GET /api/v1/get/mailbox/{address}`, `GET /api/v1/get/app-passwd/all/{address}`, `POST /api/v1/add/app-passwd`를 사용합니다. 생성은 HTTP 상태 외에 Mailcow 응답의 성공 여부도 확인하며 타임아웃 후 새 비밀번호를 무조건 재발급하지 않습니다.

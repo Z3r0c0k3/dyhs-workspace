@@ -7,6 +7,7 @@ import { Store, digest } from './store.mjs';
 import { connectOidc } from './oidc.mjs';
 import { createIdentity, creationInput, HttpError } from './identity.mjs';
 import { createMail } from './mail.mjs';
+import { createAutoMail } from './auto-mail.mjs';
 
 const random = () => randomBytes(32).toString('base64url');
 const cookieOptions = { httpOnly: true, secure: true, sameSite: 'lax', path: '/' };
@@ -20,7 +21,7 @@ function cookie(req, name) {
 }
 function equal(a, b) { return typeof a === 'string' && /^[A-Za-z0-9_-]{43}$/.test(a) && typeof b === 'string' && a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b)); }
 
-export function createApp({ config, store, oidc, identity, mail = createMail(config, store), dist = fileURLToPath(new URL('../../dist-live/', import.meta.url)) }) {
+export function createApp({ config, store, oidc, identity, autoMail = config.mail?.mode === 'sso-auto' ? createAutoMail(config, store) : null, mail = createMail(config, store, { accountResolver: autoMail?.account }), dist = fileURLToPath(new URL('../../dist-live/', import.meta.url)) }) {
   const app = express();
   app.disable('x-powered-by');
   app.set('query parser', 'simple');
@@ -61,12 +62,16 @@ export function createApp({ config, store, oidc, identity, mail = createMail(con
       if (!transaction) throw new Error('No transaction');
       const url = new URL(req.originalUrl, config.publicUrl);
       const user = await oidc.complete(url, transaction);
+      if (autoMail) {
+        try { await autoMail.ensure({ issuer: config.issuer, sub: user.sub, profile: user.profile }); }
+        catch (error) { user.profile.mailError = error instanceof HttpError ? error.message : '메일함 연결을 완료하지 못했습니다. 다시 시도해 주세요.'; }
+      }
       const old = cookie(req, sessionCookie);
       if (old) await store.logout(old);
       const session = random();
       await store.putSession(session, { issuer: config.issuer, sub: user.sub, profile: user.profile, csrf: random() }, config.sessionSeconds);
       res.cookie(sessionCookie, session, { ...cookieOptions, maxAge: config.sessionSeconds * 1000 });
-      res.redirect(303, '/');
+      res.redirect(303, autoMail ? '/#/mail' : '/');
     } catch {
       res.redirect(303, '/?auth_error=login_failed');
     }
@@ -85,16 +90,33 @@ export function createApp({ config, store, oidc, identity, mail = createMail(con
   });
   app.use('/api/mail/send', express.json({ limit: '15mb', strict: true }));
   app.use(express.json({ limit: '16kb', strict: true }));
-  app.get('/api/me', (req, res) => res.json({
+  async function mailStatus(session) {
+    if (autoMail) {
+      const result = await autoMail.status(session);
+      return { ...result, message: result.state === 'active' ? undefined : result.message || session.profile.mailError || '메일함 연결을 다시 확인해 주세요.' };
+    }
+    const address = config.mail?.accounts.find(account => account.sub === session.sub)?.address || null;
+    return { state: address ? 'active' : 'unconfigured', address };
+  }
+  app.get('/api/me', async (req, res) => {
+    const connection = await mailStatus(req.session);
+    res.json({
     id: digest(`${req.session.issuer}\n${req.session.sub}`), subject: req.session.sub,
     displayName: req.session.profile.name, email: req.session.profile.email,
-    mailbox: config.mail?.accounts.find(account => account.sub === req.session.sub)?.address || null,
+    mailbox: connection.address, mailConnection: connection, mailAutoConnect: Boolean(autoMail),
     roles: req.permissions.length ? ['user', 'identity_operator'] : ['user'], permissions: req.permissions,
     csrfToken: req.session.csrf, sessionSeconds: config.sessionSeconds,
-    capabilities: { mail: Boolean(config.mail?.accounts.some(account => account.sub === req.session.sub)), mailSend: Boolean(config.mail?.writes && config.mail.accounts.some(account => account.sub === req.session.sub)), calendar: false, identity: Boolean(config.apiToken), identityWrites: Boolean(config.apiToken && config.adminWrites) },
+    capabilities: { mail: connection.state === 'active', mailSend: Boolean(config.mail?.writes && connection.state === 'active'), calendar: false, identity: Boolean(config.apiToken), identityWrites: Boolean(config.apiToken && config.adminWrites) },
     security: { ...config.flows, advanced: `${config.authOrigin}/if/user/#/settings` },
     adminUrl: `${config.authOrigin}/if/admin/`,
-  }));
+    });
+  });
+  app.post('/api/mail/connect', async (req, res) => {
+    if (!autoMail) throw new HttpError(503, 'MAIL_AUTO_NOT_CONFIGURED', '자동 메일 연결이 설정되지 않았습니다.');
+    if (!req.body || Array.isArray(req.body) || Object.keys(req.body).length) throw new HttpError(400, 'INVALID_INPUT', '메일함은 로그인 계정에서 자동 결정됩니다.');
+    await autoMail.ensure(req.session);
+    res.json(await mailStatus(req.session));
+  });
   app.post('/api/logout', async (req, res) => {
     await store.logout(req.sessionId);
     const transaction = cookie(req, transactionCookie);

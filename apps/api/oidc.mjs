@@ -18,7 +18,7 @@ export async function connectOidc(config, fetcher = fetch) {
       const state = oidc.randomState();
       const nonce = oidc.randomNonce();
       const url = oidc.buildAuthorizationUrl(client, {
-        redirect_uri: config.redirectUri, scope: 'openid profile email', response_type: 'code',
+        redirect_uri: config.redirectUri, scope: `openid profile email${config.mail?.mode === 'sso-auto' ? ' workspace_mail' : ''}`, response_type: 'code',
         code_challenge: await oidc.calculatePKCECodeChallenge(verifier), code_challenge_method: 'S256', state, nonce,
         // Require current account authentication; a local logout cannot silently reuse SSO.
         prompt: 'login', max_age: '0',
@@ -29,12 +29,14 @@ export async function connectOidc(config, fetcher = fetch) {
       const tokens = await oidc.authorizationCodeGrant(client, url, { pkceCodeVerifier: transaction.verifier, expectedState: transaction.state, expectedNonce: transaction.nonce, idTokenExpected: true, maxAge: 0 });
       const claims = tokens.claims();
       if (!claims || typeof claims.sub !== 'string' || !claims.sub || claims.sub.length > 255) throw new Error('Invalid OIDC subject');
-      // ID/access/refresh tokens never enter cookies, browser storage, logs or the DB.
+      // Only this administrator-controlled, signed claim can select an automatic mailbox.
+      // The editable display email is never used as a fallback.
       return {
         sub: claims.sub,
         profile: {
           name: typeof claims.name === 'string' ? claims.name.slice(0, 150) : 'Workspace 사용자',
           email: claims.email_verified === true && typeof claims.email === 'string' ? claims.email.slice(0, 254) : null,
+          ...(config.mail?.mode === 'sso-auto' ? { mailboxClaim: typeof claims.workspace_mailbox === 'string' ? claims.workspace_mailbox : null } : {}),
         },
       };
     },

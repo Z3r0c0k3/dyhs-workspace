@@ -1,8 +1,10 @@
 # Dyhs Workspace
 
-MAKE;가 운영하는 통합 작업 공간입니다. **Live 서버와 정적 미리보기를 분리**했습니다. Live에는 OIDC 로그인, PostgreSQL 세션, 사용자별 IMAP/SMTP 메일 연결, 제한된 사용자·그룹 API가 구현되어 있습니다. 운영 Authentik·Mailcow 연결은 테스트 계정 검증이 남아 있습니다.
+MAKE;가 운영하는 통합 작업 공간입니다. **Live 서버와 정적 미리보기를 분리**했습니다. Live에는 OIDC 로그인, PostgreSQL 세션, SSO 계정의 메일함 자동 연결과 Workspace 내부 IMAP/SMTP 송수신, 제한된 사용자·그룹 API가 구현되어 있습니다. 운영 Authentik·Mailcow 연결은 테스트 계정 검증이 남아 있습니다.
 
 `https://workspace.dyhs.kr` 설치는 **[실서비스 연결 설치](docs/live-installation.md)**를 따르세요. 메일 CT 호스트의 Tunnel origin은 `http://127.0.0.1:3081`입니다. 현재 API는 [Live API](docs/live-api.md), 환경 변수는 [.env.example](.env.example)에 정리했습니다. CalDAV·초대·Provider 생성 등 미구현 항목도 실서비스 매뉴얼에 명시했습니다.
+
+운영자가 최초 한 번 Authentik의 `workspace_mail` claim과 Mailcow API 키를 설정하면, 사용자는 SSO 로그인만으로 기존 본인 메일함에 들어갑니다. 사용자별 비밀번호 입력·수동 파일 등록은 필요 없습니다. 설정과 기존 설치 전환 절차는 실서비스 매뉴얼 2–3절에 있습니다.
 
 ## 실행
 

@@ -40,16 +40,17 @@ export function outgoing(body) {
   return { to: body.to, cc: body.cc || [], subject: body.subject, text: body.text, attachments: attachments.map(file => ({ name: file.name, data: file.data })) };
 }
 
-export function createMail(config, store, { clientFactory = options => new ImapFlow(options), transportFactory = options => nodemailer.createTransport(options) } = {}) {
+export function createMail(config, store, { clientFactory = options => new ImapFlow(options), transportFactory = options => nodemailer.createTransport(options), accountResolver } = {}) {
   let running = 0;
   const users = new Set();
   function account(session) {
+    if (accountResolver) return accountResolver(session).then(found => ({ ...found, owner: digest(`${session.issuer}\n${session.sub}\n${found.address}`) }));
     const found = config.mail?.accounts.find(item => session.issuer === config.issuer && item.sub === session.sub);
     if (!found) throw new HttpError(503, 'MAIL_NOT_CONNECTED', '본인 메일함이 아직 연결되지 않았습니다.');
     return { ...found, owner: digest(`${session.issuer}\n${session.sub}\n${found.address}`) };
   }
   async function use(session, action) {
-    const user = account(session);
+    const user = await account(session);
     if (running >= 2 || users.has(user.owner)) throw new HttpError(429, 'MAIL_BUSY', '메일 작업을 처리 중입니다. 잠시 후 다시 시도해 주세요.');
     running++; users.add(user.owner);
     const client = clientFactory({ host: config.mail.host, port: 993, secure: true, auth: { user: user.address, pass: user.password }, logger: false, disableAutoIdle: true, connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 20000, tls: { rejectUnauthorized: true, minVersion: 'TLSv1.2' } });

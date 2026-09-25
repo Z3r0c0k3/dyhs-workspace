@@ -27,7 +27,8 @@ try {
   await writeFile(join(directory, 'roles.json'), '{"subjects":[]}', { mode: 0o644 });
   await run('docker', ['run', '-d', '--rm', '--name', name, '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true', '--memory', '512m', '--cpus', '0.5', '-p', '127.0.0.1::8080',
     '-v', `${join(directory, 'cert.pem')}:/run/test-ca.pem:ro`, '-v', `${join(directory, 'roles.json')}:/run/roles.json:ro`,
-    '-e', 'NODE_EXTRA_CA_CERTS=/run/test-ca.pem', '-e', 'WORKSPACE_PUBLIC_URL=https://workspace.example', '-e', `AUTHENTIK_BASE_URL=${authOrigin}`, '-e', `OIDC_ISSUER=${authOrigin}/issuer/`, '-e', 'OIDC_CLIENT_ID=container-test', '-e', 'OIDC_CLIENT_SECRET=container-test-secret', '-e', `DATABASE_URL=${database.href}`, '-e', 'ROLE_MAPPING_PATH=/run/roles.json', 'dyhs-workspace-live-web:local']);
+    '-e', 'NODE_EXTRA_CA_CERTS=/run/test-ca.pem', '-e', 'WORKSPACE_PUBLIC_URL=https://workspace.example', '-e', `AUTHENTIK_BASE_URL=${authOrigin}`, '-e', `OIDC_ISSUER=${authOrigin}/issuer/`, '-e', 'OIDC_CLIENT_ID=container-test', '-e', 'OIDC_CLIENT_SECRET=container-test-secret', '-e', `DATABASE_URL=${database.href}`, '-e', 'ROLE_MAPPING_PATH=/run/roles.json',
+    '-e', 'MAIL_ACCESS_MODE=sso-auto', '-e', 'MAIL_HOST=mail.workspace.example', '-e', `MAIL_ID_SECRET=${'a'.repeat(64)}`, '-e', `MAIL_CREDENTIAL_KEY=${'b'.repeat(64)}`, '-e', `MAILCOW_API_URL=${authOrigin}`, '-e', 'MAILCOW_API_KEY=test-only-key', '-e', 'MAIL_ALLOWED_DOMAINS=workspace.example', 'dyhs-workspace-live-web:local']);
   container = true;
   const port = (await run('docker', ['port', name, '8080'])).stdout.trim().split(':').at(-1);
   const origin = `http://127.0.0.1:${port}`;
@@ -44,9 +45,10 @@ try {
   assert.equal((await fetch(`${origin}/.env`)).status, 404);
   const login = await fetch(`${origin}/auth/login`, { redirect: 'manual' });
   assert.equal(login.status, 303);
+  assert.match(new URL(login.headers.get('location')).searchParams.get('scope'), /workspace_mail/);
   assert.equal(new URL(login.headers.get('location')).origin, authOrigin);
   assert.match(login.headers.get('set-cookie'), /HttpOnly.*Secure/);
-  console.log('Live container: TLS OIDC discovery, PostgreSQL, non-root/read-only runtime, assets, authentication boundary and login redirect passed.');
+  console.log('Live container: automatic mail configuration without a manual account file, TLS OIDC discovery, PostgreSQL, non-root/read-only runtime, assets, authentication boundary and login redirect passed.');
 } finally {
   if (container) await run('docker', ['rm', '-f', name]);
   if (provider) await new Promise(resolve => provider.close(resolve));

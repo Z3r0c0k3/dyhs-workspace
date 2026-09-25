@@ -58,3 +58,14 @@
 - 기존 SOGo 경로와 Cloudflare Tunnel origin, 공식 메일 참고 화면.
 
 다음 단계의 실행 순서와 환경 변수 이름은 [연동 결정](integration-decisions.md) 및 [환경 변수 예시](../.env.example)를 참고하세요. 기존 운영 서비스는 변경하지 않았습니다.
+
+
+## 2026-09-26 SSO 메일 자동 연결
+
+- `npm run build:live`: TypeScript 및 Live 번들 통과.
+- `npm run test:server`: 격리 PostgreSQL로 3개 통합 검사 통과. 서명 검증 전 Mailcow 호출 차단, SSO → 자동 발급 → 내부 메일 이동, CSRF, 주소 주입 거부, 계정별 연결 고정, 암호문/사용자 바인딩, 재시작·동시 로그인·발급 응답 유실 복구, 폐기 후 재발급 차단, 자동 자격 증명을 사용하는 IMAP/SMTP와 Sent 저장 확인.
+- `npm run test:live`: 5개 통과. 320/768/1440px 접근성·메일 송수신 UI, 홈의 내부 메일 링크, 비밀번호 입력 없는 연결 재시도 확인.
+- Docker 이미지 빌드 및 `tests/server/container-smoke.mjs`: 수동 메일 계정 파일 없이 sso-auto 기동, TLS OIDC discovery, workspace_mail scope, DB, 비루트/읽기 전용 실행 확인.
+- 임시 디렉터리의 초기 설정 생성, 키 생성/0600 권한, 필수 변수 검증, Compose config 검사 통과.
+
+Mailcow API 응답 형식은 공식 json_api.php와 functions.app_passwd.inc.php를 확인했습니다. 네트워크 인증·발급·메일 전송은 테스트 대역을 사용했으며 **운영 Authentik·Mailcow 계정으로 실제 송수신한 결과는 아닙니다**. 실제 배포의 claim·API 키·993/465 TLS 경로 검증은 실서비스 설치 문서 2–4절을 따릅니다.

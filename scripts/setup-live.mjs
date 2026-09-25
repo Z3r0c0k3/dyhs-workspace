@@ -21,13 +21,17 @@ AUTHENTIK_ENABLE_WRITES=false
 AUTHENTIK_PASSWORD_FLOW=
 AUTHENTIK_PASSKEY_FLOW=
 AUTHENTIK_MFA_FLOW=
-MAIL_ACCESS_MODE=
+MAIL_ACCESS_MODE=sso-auto
 MAIL_HOST=mail.dyhs.kr
 MAIL_ID_SECRET=${randomBytes(32).toString('hex')}
-MAIL_ENABLE_SEND=false
+MAIL_ENABLE_SEND=true
+MAILCOW_API_URL=https://mail.dyhs.kr
+MAILCOW_API_KEY=
+MAIL_ALLOWED_DOMAINS=
+MAIL_CREDENTIAL_KEY=${randomBytes(32).toString('hex')}
 `, { mode: 0o600, flag: 'wx' });
 // This file contains authorization rules, not passwords. Parent directory is private;
 // the unprivileged container must be able to read the bind-mounted file.
 await writeFile(new URL('roles.json', directory), '{"subjects":[]}\n', { mode: 0o644, flag: 'wx' });
 await writeFile(new URL('mailboxes.json', directory), '[]\n', { mode: 0o644, flag: 'wx' });
-console.log('Created infra/secrets configuration files. Keep this directory private. Set OIDC values before starting. No secrets printed.');
+console.log('Created infra/secrets configuration files. Keep this directory private. Set OIDC, Mailcow API key and allowed mail domains before starting. No secrets printed.');

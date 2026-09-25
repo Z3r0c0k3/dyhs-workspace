@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
-const me = { displayName: '테스트 사용자', email: 'member@workspace.example', subject: 'test-sub', csrfToken: 'test-csrf', mailbox: 'member@workspace.example', permissions: ['identity.users.read', 'identity.users.create', 'identity.groups.read', 'identity.groups.create'], capabilities: { mail: true, mailSend: true, calendar: false, identity: true, identityWrites: true }, security: { password: 'https://auth.example/if/flow/password/', passkey: 'https://auth.example/if/flow/passkey/', mfa: null, advanced: 'https://auth.example/if/user/#/settings' }, adminUrl: 'https://auth.example/if/admin/' };
+const me = { mailAutoConnect: true, mailConnection: { state: 'active', address: 'member@workspace.example' }, displayName: '테스트 사용자', email: 'member@workspace.example', subject: 'test-sub', csrfToken: 'test-csrf', mailbox: 'member@workspace.example', permissions: ['identity.users.read', 'identity.users.create', 'identity.groups.read', 'identity.groups.create'], capabilities: { mail: true, mailSend: true, calendar: false, identity: true, identityWrites: true }, security: { password: 'https://auth.example/if/flow/password/', passkey: 'https://auth.example/if/flow/passkey/', mfa: null, advanced: 'https://auth.example/if/user/#/settings' }, adminUrl: 'https://auth.example/if/admin/' };
 test('live login has no example account or administrator toggle', async ({ page }) => {
   await page.route('**/api/me', route => route.fulfill({ status: 401, json: { code: 'SESSION_EXPIRED' } }));
   await page.goto('/');
@@ -40,6 +40,7 @@ for (const width of [320, 768, 1440]) test(`live account, management and mail wo
     await page.goto(`/#/${path}`);
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByRole('button', { name: '로그아웃' })).toBeVisible();
+    if (path === 'home') { await expect(page.getByRole('link', { name: '내 메일함 열기', exact: true })).toHaveAttribute('href', '#/mail'); await expect(page.getByText(/메일함 연결됨/)).toBeVisible(); }
     if (path === 'mail') await expect(page.getByRole('button', { name: /한글 메일/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations.map(v => v.id)).toEqual([]);
@@ -59,4 +60,26 @@ for (const width of [320, 768, 1440]) test(`live account, management and mail wo
   expect(external).toEqual([]);
   await page.getByRole('button', { name: '로그아웃' }).click();
   await expect(page.getByRole('link', { name: 'Dyhs Auth로 로그인' })).toBeVisible();
+});
+
+
+test('automatic mailbox connection can be retried without entering credentials', async ({ page }) => {
+  let connected = false;
+  await page.route('**/api/**', async route => {
+    const request = route.request(), path = new URL(request.url()).pathname;
+    if (path === '/api/me') return route.fulfill({ json: connected ? me : { ...me, mailbox: null, mailConnection: { state: 'pending', address: null, message: '메일 서버 연결을 다시 확인해 주세요.' }, capabilities: { ...me.capabilities, mail: false, mailSend: false } } });
+    if (path === '/api/mail/connect') {
+      expect(request.postDataJSON()).toEqual({}); expect(request.headers()['x-csrf-token']).toBe(me.csrfToken);
+      connected = true; return route.fulfill({ json: me.mailConnection });
+    }
+    if (path === '/api/mail/folders') return route.fulfill({ json: [{ id: 'INBOX', name: '받은편지함', unread: 0 }] });
+    if (path === '/api/mail/messages') return route.fulfill({ json: { items: [], nextCursor: null } });
+    return route.fulfill({ status: 404 });
+  });
+  await page.goto('/#/mail');
+  await expect(page.getByText('메일 서버 연결을 다시 확인해 주세요.')).toBeVisible();
+  await expect(page.locator('input')).toHaveCount(0);
+  await page.getByRole('button', { name: '메일함 다시 연결' }).click();
+  await expect(page.getByRole('button', { name: '메일 쓰기' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '메일함 연결 확인' })).toHaveCount(0);
 });
