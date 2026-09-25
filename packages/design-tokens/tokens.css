@@ -1,0 +1,30 @@
+:root {
+  --brand: #34408D;
+  --black: #000000;
+  --white: #FFFFFF;
+  --surface: var(--white);
+  --text: var(--black);
+  --muted: rgba(0, 0, 0, .64);
+  --line: rgba(0, 0, 0, .12);
+  --selected: rgba(52, 64, 141, .08);
+  --focus: var(--brand);
+  --accent-text: var(--brand);
+  --soft: rgba(0, 0, 0, .018);
+  --button-bg: var(--brand);
+  --button-text: var(--white);
+  --font-ui: 'Pretendard Variable', Pretendard, sans-serif;
+  --radius-control: 8px;
+  --radius-card: 12px;
+}
+[data-theme='dark'] {
+  --surface: var(--black);
+  --text: var(--white);
+  --muted: rgba(255, 255, 255, .72);
+  --line: rgba(255, 255, 255, .24);
+  --selected: rgba(255, 255, 255, .12);
+  --focus: var(--white);
+  --accent-text: var(--white);
+  --soft: rgba(255, 255, 255, .04);
+  --button-bg: var(--white);
+  --button-text: var(--black);
+}

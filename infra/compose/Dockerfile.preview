@@ -1,0 +1,14 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json index.html ./
+COPY apps/web/src ./apps/web/src
+COPY packages/design-tokens ./packages/design-tokens
+COPY public ./public
+RUN npm run build
+
+FROM nginxinc/nginx-unprivileged:stable-alpine
+COPY infra/compose/nginx.preview.conf /etc/nginx/conf.d/default.conf
+COPY --from=build --chown=nginx:nginx /app/dist /usr/share/nginx/html
+EXPOSE 8080

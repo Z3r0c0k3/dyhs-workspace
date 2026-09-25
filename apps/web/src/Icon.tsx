@@ -1,0 +1,33 @@
+const paths: Record<string, string> = {
+  home: 'm3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z',
+  mail: 'M3 5h18v14H3z M3 5l9 7 9-7',
+  calendar: 'M4 5h16v16H4z M4 10h16 M8 3v4 M16 3v4',
+  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M17 4a4 4 0 0 1 0 7 M22 21v-2a4 4 0 0 0-3-3.87',
+  link: 'M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2 M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2',
+  settings: 'M4 7h16 M4 17h16 M8 4v6 M16 14v6',
+  shield: 'M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7z M9 12l2 2 4-4',
+  inbox: 'M4 4h16l2 11v5H2v-5z M2 15h6l2 3h4l2-3h6',
+  star: 'm12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z',
+  send: 'm22 2-7 20-4-9-9-4z M22 2 11 13',
+  file: 'M14 2H4v20h16V8z M14 2v6h6 M8 13h8 M8 17h5',
+  trash: 'M3 6h18 M9 6V3h6v3 M5 6l1 15h12l1-15 M10 10v7 M14 10v7',
+  folder: 'M3 5h6l2 3h10v12H3z',
+  plus: 'M12 5v14 M5 12h14',
+  arrow: 'M5 12h14 M14 7l5 5-5 5',
+  back: 'M19 12H5 M10 7l-5 5 5 5',
+  down: 'm6 9 6 6 6-6',
+  search: 'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14 M15 15l6 6',
+  close: 'm6 6 12 12 M18 6 6 18',
+  check: 'm5 12 4 4 10-10',
+  info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 11v6 M12 7v1',
+  paperclip: 'm8 12 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9 M6 14l8-8',
+  reply: 'm9 10-6 5 6 5 M3 15h11a6 6 0 0 0 0-12h-2',
+  logout: 'M9 3H3v18h6 M9 12h12 M16 7l5 5-5 5',
+  moon: 'M21 13a9 9 0 0 1-10-10A9 9 0 1 0 21 13',
+  sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1 1 M18 18l1 1 M19 5l-1 1 M6 18l-1 1',
+  disk: 'M4 4h16v16H4z M8 4v6h8V4 M8 20v-6h8v6',
+  menu: 'M4 6h16 M4 12h16 M4 18h16',
+};
+export function Icon({ name, size = 20 }: { name: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] || paths.info} /></svg>;
+}

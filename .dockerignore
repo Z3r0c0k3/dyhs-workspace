@@ -1,0 +1,17 @@
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!index.html
+!apps/
+!apps/web/
+!apps/web/src/
+!apps/web/src/**
+!packages/
+!packages/design-tokens/
+!packages/design-tokens/**
+!public/
+!public/**
+!infra/
+!infra/compose/
+!infra/compose/nginx.preview.conf
