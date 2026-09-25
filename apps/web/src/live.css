@@ -1,0 +1,52 @@
+.live-workspace { min-height: 100dvh; }
+.live-login { padding: 24px; gap: 18px; }
+.live-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 32px; border-bottom: 1px solid var(--line); }
+.live-brand, .live-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.live-brand { gap: 8px; }
+.live-brand .make-logo { --make-width: 80px; }
+.live-nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 32px; border-bottom: 1px solid var(--line); }
+.live-nav a { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; min-height: 44px; }
+.live-nav a.active { background: var(--selected); font-weight: 700; }
+.live-main { width: min(1200px, 100%); padding: 32px; margin: auto; overflow-wrap: anywhere; }
+.live-main .panel { min-width: 0; }
+.live-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 24px 0; }
+.live-cards .panel, .live-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; padding: 28px; }
+.live-empty { margin: 32px 0; }
+.live-identity { margin-top: 24px; }
+.live-identity summary { cursor: pointer; padding: 12px 0; }
+.live-identity code { overflow-wrap: anywhere; }
+.live-admin-body { padding: 24px; display: grid; gap: 24px; }
+.live-create, .live-create fieldset { display: grid; gap: 16px; }
+.live-create fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.live-create input { width: 100%; }
+.live-main .page-footer { margin-top: 48px; }
+.live-mail-toolbar { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 24px 0; }
+.live-mail-toolbar label, .live-compose label { display: grid; gap: 8px; }
+.live-mail-toolbar select { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 10px; max-width: 100%; }
+.live-mail-grid { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr); gap: 16px; }
+.live-message-list { padding: 12px; }
+.live-message-list > button { display: grid; gap: 6px; width: 100%; text-align: left; padding: 14px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.live-message-list > button.active { background: var(--selected); }
+.live-message-list > button span, .live-message-list > button small { color: var(--muted); }
+.live-message-detail { padding: 20px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.live-mail-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; max-width: 100%; }
+.live-compose { padding: 24px; margin: 20px 0; display: grid; gap: 16px; }
+.live-compose fieldset { display: grid; gap: 16px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.live-compose input, .live-compose textarea { width: 100%; }
+.live-operation { display: block; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .live-header { padding: 12px 16px; flex-wrap: wrap; }
+  .live-header .live-actions { width: 100%; justify-content: flex-end; }
+  .live-header .live-actions > span { margin-right: auto; max-width: 45%; overflow-wrap: anywhere; }
+  .live-main { padding: 24px 16px; }
+  .live-nav { padding: 8px; gap: 0; }
+  .live-nav a { padding: 10px; font-size: 13px; }
+  .live-cards { grid-template-columns: 1fr; }
+  .live-admin-body { padding: 16px; }
+  .live-main .page-heading { align-items: flex-start; flex-direction: column; }
+  .live-mail-grid { grid-template-columns: minmax(0, 1fr); }
+  .live-mail-grid.has-detail .live-message-list { display: none; }
+  .live-mail-grid:not(.has-detail) .live-message-detail { display: none; }
+  .live-mail-toolbar label { width: 100%; }
+  .live-compose { padding: 16px; }
+}

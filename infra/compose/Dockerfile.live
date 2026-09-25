@@ -1,0 +1,20 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json index.html vite.config.ts ./
+COPY apps/web/src ./apps/web/src
+COPY packages/design-tokens ./packages/design-tokens
+COPY public ./public
+RUN npm run build:live
+
+FROM node:24-alpine AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY --from=build --chown=node:node /app/dist-live ./dist-live
+COPY --chown=node:node apps/api ./apps/api
+USER node
+EXPOSE 8080
+CMD ["node", "apps/api/server.mjs"]

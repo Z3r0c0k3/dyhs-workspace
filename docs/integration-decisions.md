@@ -1,6 +1,6 @@
 # 연동 결정 기록
 
-작성일: 2026-09-24. 상태: **0단계 조사/설계 완료, 1단계 목업 구현, 2–6단계 보류**.
+최신 갱신: 2026-09-25. Live OIDC/서버 세션·명시적 sub 매핑·앱 비밀번호 IMAP/SMTP 및 제한된 계정 관리 코드를 추가했습니다. 격리 테스트 통과, 운영 연결 검증은 미실시입니다. **최신 실행 범위는 [Live 설치](live-installation.md), 실제 계약은 [Live API](live-api.md)를 기준으로 합니다.** 아래는 2026-09-24 초기 조사/설계 기록입니다.
 
 추가 결정: Workspace는 **메일 CT**에 별도 서비스로 배포하고 Auth(`sso.dyhs.kr`)·Mail(`mail.dyhs.kr`)·URL(`url.dyhs.kr`)은 서로 다른 CT를 유지합니다. 캘린더 원본은 Mailcow SOGo CalDAV로 확정했습니다. 기본 계정 보안 3종, 간편 Authentik 관리, 추후 AMS 연동의 최신 설계는 [배포 및 계정 관리 확장](deployment-and-identity.md)을 기준으로 합니다.
 

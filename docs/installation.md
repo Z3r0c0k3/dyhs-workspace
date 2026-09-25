@@ -1,5 +1,7 @@
 # Dyhs Workspace 설치 매뉴얼
 
+**실서비스 연결은 [새 Live 설치 매뉴얼](live-installation.md)을 따르세요.** 아래는 기존 정적 미리보기 전용 절차입니다. Live는 `workspace.dyhs.kr`과 메일 CT 호스트의 loopback 3081을 사용합니다.
+
 최종 갱신: 2026-09-24. 현재 소스의 **0.1.0 정적 미리보기** 기준입니다. Docker 빌드·실행은 로컬 OrbStack에서 검증했으며 실제 메일 CT에서는 아직 검증하지 않았습니다.
 
 ## 1. 설치 범위와 배치

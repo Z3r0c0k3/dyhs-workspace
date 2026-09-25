@@ -1,5 +1,15 @@
 # 구현 및 검증 기록
 
+## 2026-09-25 Live 추가 검증
+
+- OIDC/서버 API: 실제 격리 PostgreSQL에 세션을 저장하고 PKCE·state·nonce·서명·issuer·audience·만료·재인증·CSRF·권한 범위·중복 생성 차단을 검증했습니다.
+- 메일: IMAP/SMTP 대역과 실제 MIME 라이브러리로 다른 사용자/UIDVALIDITY/첨부 접근, 한글 HTML+첨부, 발신자 고정, SMTP 불명·부분 수락·Sent 저장 실패와 중복 재전송 방지를 검증했습니다.
+- `npm run test:live`: 4개 시나리오 통과. 320/768/1440px 홈·계정·관리·메일의 가로 넘침과 axe AA 위반 없음. API 응답 대역으로 발송 UI·본문 안전 표시·로그아웃 확인.
+- Live 이미지 빌드 및 `tests/server/container-smoke.mjs`: 실제 Docker의 TLS OIDC discovery·PostgreSQL·비루트 UID 1000·읽기 전용 실행·로고·API 401·로그인 리다이렉트 검사 통과.
+- 운영 Authentik·Mailcow에 대한 실제 로그인/메일 전송은 미실시입니다. 출시 전 확인과 현재 제한은 [Live 설치](live-installation.md)에 명시했습니다.
+
+## 2026-09-24 미리보기 검증
+
 검증일: 2026-09-24. 범위: 로컬 목업, 운영 서버 연결 없음.
 
 ## 실행 결과

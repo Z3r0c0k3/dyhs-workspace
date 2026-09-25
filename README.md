@@ -1,10 +1,12 @@
 # Dyhs Workspace
 
-MAKE;가 운영하는 통합 작업 공간의 **0단계 설계 + 1단계 UI 목업**입니다. 실제 인증·메일 서버에 연결되지 않았습니다. 첨부 기획서의 안전한 연동 선행 조건에 따라 실제 메일 기능은 구현 범위에서 보류했습니다.
+MAKE;가 운영하는 통합 작업 공간입니다. **Live 서버와 정적 미리보기를 분리**했습니다. Live에는 OIDC 로그인, PostgreSQL 세션, 사용자별 IMAP/SMTP 메일 연결, 제한된 사용자·그룹 API가 구현되어 있습니다. 운영 Authentik·Mailcow 연결은 테스트 계정 검증이 남아 있습니다.
+
+`https://workspace.dyhs.kr` 설치는 **[실서비스 연결 설치](docs/live-installation.md)**를 따르세요. 메일 CT 호스트의 Tunnel origin은 `http://127.0.0.1:3081`입니다. 현재 API는 [Live API](docs/live-api.md), 환경 변수는 [.env.example](.env.example)에 정리했습니다. CalDAV·초대·Provider 생성 등 미구현 항목도 실서비스 매뉴얼에 명시했습니다.
 
 ## 실행
 
-메일 CT 설치, SSH 접속, 업데이트·복구와 문제 해결은 [설치 매뉴얼](docs/installation.md)을 참고하세요. 현재 설치 대상은 실제 서비스 연동 전의 정적 미리보기입니다.
+아래 명령과 화면 설명은 **정적 미리보기 모드** 기준입니다. 해당 모드의 설치·SSH 접속·복구는 [미리보기 설치 매뉴얼](docs/installation.md)을 참고하세요. Live 빌드는 `npm run build:live`, 서버 실행은 설정 후 `npm start`입니다.
 
 Node.js 24 LTS 권장. React + TypeScript + Vite를 사용합니다.
 
@@ -46,7 +48,7 @@ tests/                    Node 로직 검사 + Playwright/axe UI 검사
 
 Workspace는 Dockerized Mailcow가 운영되는 **메일 CT**에 별도 서비스로 배포할 예정입니다. `sso.dyhs.kr`(Auth CT), `mail.dyhs.kr`(메일 CT), `url.dyhs.kr`(URL CT)은 기존 분리를 유지합니다. 캘린더는 Mailcow SOGo CalDAV를 사용하며 AMS는 향후 독립 OIDC 앱으로 연결합니다.
 
-API·DB·운영 연동은 아직 만들지 않았습니다. 정적 미리보기를 위한 독립 Compose를 추가했으며 기존 Mailcow Compose·네트워크·볼륨은 사용하지 않습니다. 공개 배포는 하지 않았습니다.
+아래 미리보기 Compose에는 API·DB가 없습니다. Live는 별도 `compose.live.yaml`을 사용합니다. 두 구성 모두 기존 Mailcow Compose·네트워크·볼륨을 사용하지 않습니다. 공개 배포는 수행하지 않았습니다.
 
 ```sh
 docker compose -f infra/compose/compose.preview.yaml up -d --build --wait --wait-timeout 120

@@ -3,10 +3,13 @@
 !package-lock.json
 !tsconfig.json
 !index.html
+!vite.config.ts
 !apps/
 !apps/web/
 !apps/web/src/
 !apps/web/src/**
+!apps/api/
+!apps/api/**
 !packages/
 !packages/design-tokens/
 !packages/design-tokens/**

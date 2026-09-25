@@ -1,0 +1,75 @@
+name: dyhs-workspace-live
+services:
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/compose/Dockerfile.live
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:3081:8080"
+    environment:
+      NODE_ENV: production
+      WORKSPACE_PUBLIC_URL: ${WORKSPACE_PUBLIC_URL:?Set WORKSPACE_PUBLIC_URL}
+      OIDC_ISSUER: ${OIDC_ISSUER:?Set the issuer shown in Authentik}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Set OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET}
+      DATABASE_URL: postgresql://workspace:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/workspace
+      ROLE_MAPPING_PATH: /run/secrets/roles.json
+      AUTHENTIK_BASE_URL: ${AUTHENTIK_BASE_URL:-https://sso.dyhs.kr}
+      AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN:-}
+      AUTHENTIK_USER_PATH: ${AUTHENTIK_USER_PATH:-}
+      AUTHENTIK_GROUP_IDS: ${AUTHENTIK_GROUP_IDS:-}
+      AUTHENTIK_ENABLE_WRITES: ${AUTHENTIK_ENABLE_WRITES:-false}
+      AUTHENTIK_PASSWORD_FLOW: ${AUTHENTIK_PASSWORD_FLOW:-}
+      AUTHENTIK_PASSKEY_FLOW: ${AUTHENTIK_PASSKEY_FLOW:-}
+      AUTHENTIK_MFA_FLOW: ${AUTHENTIK_MFA_FLOW:-}
+      MAIL_ACCESS_MODE: ${MAIL_ACCESS_MODE:-}
+      MAIL_ACCOUNTS_PATH: /run/secrets/mailboxes.json
+      MAIL_HOST: ${MAIL_HOST:-mail.dyhs.kr}
+      MAIL_ID_SECRET: ${MAIL_ID_SECRET:-}
+      MAIL_ENABLE_SEND: ${MAIL_ENABLE_SEND:-false}
+    volumes:
+      - ../secrets/roles.json:/run/secrets/roles.json:ro
+      - ../secrets/mailboxes.json:/run/secrets/mailboxes.json:ro
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 100
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: workspace
+      POSTGRES_DB: workspace
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - database:/var/lib/postgresql/data
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 100
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workspace -d workspace"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+volumes:
+  database:
