@@ -4,7 +4,7 @@ import { createServer } from 'node:https';
 import { once } from 'node:events';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout } from 'node:timers/promises';
@@ -24,10 +24,9 @@ try {
   provider.listen(0, '0.0.0.0'); await once(provider, 'listening');
   authOrigin = `https://host.docker.internal:${provider.address().port}`;
   const database = new URL(process.env.TEST_DATABASE_URL); database.hostname = 'host.docker.internal';
-  await writeFile(join(directory, 'roles.json'), '{"subjects":[]}', { mode: 0o644 });
   await run('docker', ['run', '-d', '--rm', '--name', name, '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges:true', '--memory', '512m', '--cpus', '0.5', '-p', '127.0.0.1::8080',
-    '-v', `${join(directory, 'cert.pem')}:/run/test-ca.pem:ro`, '-v', `${join(directory, 'roles.json')}:/run/roles.json:ro`,
-    '-e', 'NODE_EXTRA_CA_CERTS=/run/test-ca.pem', '-e', 'WORKSPACE_PUBLIC_URL=https://workspace.example', '-e', `AUTHENTIK_BASE_URL=${authOrigin}`, '-e', `OIDC_ISSUER=${authOrigin}/issuer/`, '-e', 'OIDC_CLIENT_ID=container-test', '-e', 'OIDC_CLIENT_SECRET=container-test-secret', '-e', `DATABASE_URL=${database.href}`, '-e', 'ROLE_MAPPING_PATH=/run/roles.json',
+    '-v', `${join(directory, 'cert.pem')}:/run/test-ca.pem:ro`,
+    '-e', 'NODE_EXTRA_CA_CERTS=/run/test-ca.pem', '-e', 'WORKSPACE_PUBLIC_URL=https://workspace.example', '-e', `AUTHENTIK_BASE_URL=${authOrigin}`, '-e', `OIDC_ISSUER=${authOrigin}/issuer/`, '-e', 'OIDC_CLIENT_ID=container-test', '-e', 'OIDC_CLIENT_SECRET=container-test-secret', '-e', `DATABASE_URL=${database.href}`,
     '-e', 'MAIL_ACCESS_MODE=sso-auto', '-e', 'MAIL_HOST=mail.workspace.example', '-e', `MAIL_ID_SECRET=${'a'.repeat(64)}`, '-e', `MAIL_CREDENTIAL_KEY=${'b'.repeat(64)}`, '-e', `MAILCOW_API_URL=${authOrigin}`, '-e', 'MAILCOW_API_KEY=test-only-key', '-e', 'MAIL_ALLOWED_DOMAINS=workspace.example', 'dyhs-workspace-live-web:local']);
   container = true;
   const port = (await run('docker', ['port', name, '8080'])).stdout.trim().split(':').at(-1);

@@ -34,7 +34,7 @@ node scripts/setup-live.mjs
 docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/app" -w /app node:24-alpine node scripts/setup-live.mjs
 ```
 
-`infra/secrets/`에 환경 파일, 권한 파일, 빈 메일 매핑 파일을 만듭니다. 기존 파일을 덮어쓰지 않습니다. 디렉터리는 0700, 환경 파일은 0600입니다. JSON 파일은 비루트 컨테이너가 읽을 수 있게 0644이며 **상위 비밀 디렉터리의 0700 권한을 유지**해야 합니다. 이 경로는 Git과 이미지 빌드에서 제외됩니다. 내용을 채팅·이슈·공개 로그에 올리지 마세요.
+`infra/secrets/`에 환경 파일과 빈 메일 매핑 파일을 만듭니다. 기존 파일을 덮어쓰지 않습니다. 디렉터리는 0700, 환경 파일은 0600입니다. JSON 파일은 비루트 컨테이너가 읽을 수 있게 0644이며 **상위 비밀 디렉터리의 0700 권한을 유지**해야 합니다. 이 경로는 Git과 이미지 빌드에서 제외됩니다. 내용을 채팅·이슈·공개 로그에 올리지 마세요.
 
 ## 2. Authentik에서 Workspace 앱 등록
 
@@ -170,21 +170,17 @@ AUTHENTIK_MFA_FLOW=
 
 제한된 Authentik API 계정/토큰을 준비하고 `AUTHENTIK_API_TOKEN`에 설정합니다. 메일 API 키를 여기에 사용하지 않습니다. 대상 버전의 `/api/v3/schema/`와 RBAC를 확인한 뒤 테스트합니다.
 
-`infra/secrets/roles.json`에 관리자의 **이 Workspace Provider sub**를 명시합니다. 그룹명이나 브라우저의 role 값을 권한으로 사용하지 않습니다.
+Workspace 관리자 권한은 **Authentik의 `dyhs-admins` 그룹 소속**으로 결정합니다. 그룹 이름은 대소문자까지 정확히 일치해야 하며 Authentik의 Superuser privileges는 필요하지 않습니다. 멤버는 현재 구현된 사용자·그룹 조회/생성 권한과 관리 메뉴를 자동으로 받습니다.
+
+Workspace Provider에서 기본 **`profile` scope mapping**을 선택하고 **Include claims in ID token**을 켭니다. Authentik의 기본 profile mapping은 실제 그룹 소속을 `groups` 문자열 배열로 반환합니다. 커스텀 mapping을 사용한다면 같은 형식으로 실제 그룹 이름을 반환하도록 설정하세요. 사용자 수정 가능한 속성에서 groups를 만들지 마세요. [Authentik 기본 profile mapping](https://github.com/goauthentik/authentik/blob/main/blueprints/system/providers-oauth2.yaml)
 
 ```json
-{
-  "subjects": [
-    {
-      "sub": "관리자의_Workspace_Provider_sub",
-      "permissions": [
-        "identity.users.read", "identity.users.create",
-        "identity.groups.read", "identity.groups.create"
-      ]
-    }
-  ]
-}
+{"groups": ["dyhs-students", "dyhs-admins"]}
 ```
+
+위 값은 **서명된 ID token의 claim 예시**이며 Workspace에 업로드하거나 입력하는 설정이 아닙니다. 서버가 검증한 그룹 소속만 신뢰합니다. claim 누락/형식 오류/다른 그룹이면 일반 사용자이며, `authentik Admins` 소속만으로는 Workspace 관리자 권한을 받지 않습니다.
+
+기존 설치의 `roles.json` 및 `ROLE_MAPPING_PATH`는 더 이상 사용하지 않습니다. 관리자 사용자를 Authentik의 `dyhs-admins`에 추가한 뒤 **로그아웃하고 다시 로그인**하세요. 기존 Workspace 세션에도 재로그인이 필요합니다. 그룹 제거는 다음 로그인부터 반영되며 이전 세션에는 최대 15분간 권한이 남을 수 있습니다. 즉시 반영하려면 5절의 세션 폐기 명령을 사용합니다.
 
 `AUTHENTIK_USER_PATH`는 조회/생성할 정확한 사용자 경로입니다. 다른 경로·서비스 계정·superuser는 조회에서 제외합니다. `AUTHENTIK_GROUP_IDS`에는 조회를 허용한 일반 그룹 UUID를 쉼표로 구분해 입력합니다. Workspace에서 생성에 성공한 그룹도 조회 대상에 포함됩니다. 상위 API의 RBAC 역시 같은 범위를 제한해야 합니다.
 

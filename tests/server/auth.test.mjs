@@ -7,7 +7,6 @@ import { connectOidc } from '../../apps/api/oidc.mjs';
 import { createApp } from '../../apps/api/server.mjs';
 import { createAutoMail } from '../../apps/api/auto-mail.mjs';
 import { createIdentity } from '../../apps/api/identity.mjs';
-import { validatePolicy } from '../../apps/api/config.mjs';
 
 test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', async t => {
   assert.ok(process.env.TEST_DATABASE_URL, 'Set TEST_DATABASE_URL to an isolated PostgreSQL database');
@@ -22,10 +21,7 @@ test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', a
     mail: { mode: 'sso-auto', accounts: [], host: 'mail.workspace.example', idSecret: 'a'.repeat(64), writes: true, auto: { apiUrl: 'https://mail.workspace.example', apiKey: 'mailcow-test-key', credentialKey: 'b'.repeat(64), domains: ['workspace.example'] } },
     clientId: 'test-client', clientSecret: 'test-client-secret', sessionSeconds: 900,
     apiToken: 'test-api-token', userPath: 'workspace', groupIds: [], adminWrites: true, flows: { password: null, passkey: null, mfa: null },
-    policy: validatePolicy({ subjects: [{ sub: 'admin-sub', permissions: ['identity.users.read', 'identity.users.create', 'identity.groups.read', 'identity.groups.create'] }] }),
   };
-  assert.throws(() => validatePolicy({ subjects: [{ sub: 'a', permissions: ['superuser'] }] }));
-  assert.throws(() => validatePolicy({ subjects: [{ sub: 'a', permissions: [] }, { sub: 'a', permissions: [] }] }));
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const wrongKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
   const b64 = value => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -43,7 +39,7 @@ test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', a
     assert.ok(record);
     assert.equal(createHash('sha256').update(body.get('code_verifier')).digest('base64url'), record.params.get('code_challenge'));
     const now = Math.floor(Date.now() / 1000);
-    const claims = { iss: config.issuer, aud: config.clientId, sub: record.sub || 'admin-sub', iat: now, exp: now + 300, auth_time: now, nonce: record.params.get('nonce'), name: '테스트 사용자', email: 'member@workspace.example', email_verified: true, workspace_mailbox: 'member@workspace.example', groups: ['admin'], ...record.claims };
+    const claims = { iss: config.issuer, aud: config.clientId, sub: record.sub || 'admin-sub', iat: now, exp: now + 300, auth_time: now, nonce: record.params.get('nonce'), name: '테스트 사용자', email: 'member@workspace.example', email_verified: true, workspace_mailbox: 'member@workspace.example', groups: ['dyhs-students', 'dyhs-admins'], ...record.claims };
     const payload = `${b64({ alg: 'RS256', kid: 'test-key' })}.${b64(claims)}`;
     const token = `${payload}.${sign('RSA-SHA256', Buffer.from(payload), record.badSignature ? wrongKey : privateKey).toString('base64url')}`;
     return Response.json({ token_type: 'Bearer', access_token: 'test-access-token', expires_in: 300, id_token: token });
@@ -116,16 +112,19 @@ test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', a
   const session = sessionHeader.split(';')[0]; const sessionId = session.split('=')[1];
   const me = await (await request('/api/me', { headers: { Cookie: session } })).json();
   assert.equal(me.mailbox, 'member@workspace.example'); assert.equal(me.mailConnection.state, 'active'); assert.equal(me.capabilities.mailSend, true); assert.equal(me.displayName, '테스트 사용자'); assert.ok(me.permissions.includes('identity.users.read'));
+  assert.deepEqual(me.roles, ['user', 'workspace_admin']);
+  assert.equal(me.permissions.length, 4);
   assert.doesNotMatch(JSON.stringify(me), /test-access-token|test-client-secret|test-api-token|mailcow-test-key|ciphertext|app_passwd/);
   const dbRow = (await store.pool.query('SELECT id FROM workspace_sessions')).rows[0];
   assert.equal(dbRow.id, digest(sessionId)); assert.notEqual(dbRow.id, sessionId);
   const secondStore = new Store(process.env.TEST_DATABASE_URL);
   assert.equal((await secondStore.session(sessionId)).sub, 'admin-sub'); await secondStore.close();
-  const userSession = (await login({ sub: 'different-sub-same-email' })).headers.getSetCookie().find(value => value.startsWith('__Host-dyhs_session=')).split(';')[0];
+  const userSession = (await login({ sub: 'different-sub-same-email', claims: { groups: ['dyhs-students'] } })).headers.getSetCookie().find(value => value.startsWith('__Host-dyhs_session=')).split(';')[0];
   assert.equal((await (await request('/api/me', { headers: { Cookie: userSession } })).json()).capabilities.mail, false);
   assert.equal(issued, 1, 'Another subject cannot take the same mailbox');
   const calls = upstream.length;
   assert.equal((await request('/api/admin/users', { headers: { Cookie: userSession, 'X-Role': 'platform_admin' } })).status, 403);
+  assert.equal((await request('/api/admin/groups', { headers: { Cookie: userSession } })).status, 403);
   assert.equal(upstream.length, calls);
   assert.equal((await (await request('/api/me', { headers: { Cookie: userSession } })).json()).permissions.length, 0);
   const users = await (await request('/api/admin/users', { headers: { Cookie: session } })).json();
@@ -152,8 +151,15 @@ test('OIDC signature, session, CSRF, scopes and durable mutation idempotency', a
   const retry = await write('/api/admin/users', body, { 'Idempotency-Key': failedKey });
   assert.equal(retry.status, 409); assert.equal((await retry.json()).status, 'unknown');
   config.adminWrites = false; assert.equal((await write('/api/admin/groups', { name: 'Blocked' })).status, 503);
-  const saved = config.policy.subjects[0].permissions; config.policy.subjects[0].permissions = [];
-  assert.equal((await request('/api/admin/users', { headers: { Cookie: session } })).status, 403); config.policy.subjects[0].permissions = saved;
+  // Same subject loses privileges on its next login after group removal.
+  // Malformed/missing claims and similar names never grant administrator access.
+  for (const groups of [undefined, [], 'dyhs-admins', ['DYHS-ADMINS'], ['dyhs-admins-extra'], ['authentik Admins'], ['dyhs-admins', 1]]) {
+    const response = await login({ claims: { groups } });
+    const deniedSession = response.headers.getSetCookie().find(value => value.startsWith('__Host-dyhs_session=')).split(';')[0];
+    const deniedMe = await (await request('/api/me', { headers: { Cookie: deniedSession, 'X-Groups': 'dyhs-admins', 'X-Role': 'workspace_admin' } })).json();
+    assert.deepEqual(deniedMe.roles, ['user']); assert.deepEqual(deniedMe.permissions, []);
+    assert.equal((await request('/api/admin/users', { headers: { Cookie: deniedSession, 'X-Groups': 'dyhs-admins' } })).status, 403);
+  }
   assert.equal((await write('/api/logout', {})).status, 204);
   assert.equal((await request('/api/me', { headers: { Cookie: session } })).status, 401);
   await store.pool.query("UPDATE workspace_sessions SET expires_at=now() - interval '1 second'");

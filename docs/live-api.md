@@ -35,3 +35,5 @@ JSON 오류는 `{code,message,requestId}`이며 세션 없음/만료 401, 권한
 `mailAutoConnect`는 자동 연결 모드 여부입니다. `mailConnection`은 `{state,address,message?}`이며 상태는 `pending`, `creating`, `active`, `revoked`, `blocked`, `unconfigured`입니다. 활성 연결에만 address와 mail/mailSend capability를 제공합니다. 서버 설정 및 서명된 `workspace_mailbox` claim으로만 대상을 결정하며 claim 자체나 암호화된 비밀번호를 API에 반환하지 않습니다.
 
 자동 연결은 `workspace_mail` scope를 요청합니다. Mailcow 요청은 `GET /api/v1/get/mailbox/{address}`, `GET /api/v1/get/app-passwd/all/{address}`, `POST /api/v1/add/app-passwd`를 사용합니다. 생성은 HTTP 상태 외에 Mailcow 응답의 성공 여부도 확인하며 타임아웃 후 새 비밀번호를 무조건 재발급하지 않습니다.
+
+관리자 판정은 검증된 ID token의 `groups` 문자열 배열에 정확한 `dyhs-admins`가 있는지로 결정합니다. 해당 사용자의 `roles`는 `["user","workspace_admin"]`이고 현재 지원하는 4개 identity 권한을 제공합니다. 서버 세션에 판정 결과를 보관하며 브라우저 헤더·role·이메일·기존 sub 매핑으로 권한을 부여하지 않습니다. API 토큰/RBAC와 쓰기 활성화 설정은 별도로 적용됩니다. 그룹 소속 변경은 재로그인 또는 최대 15분 세션 만료 후 반영됩니다.

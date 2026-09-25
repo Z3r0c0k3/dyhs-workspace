@@ -34,6 +34,8 @@ export async function connectOidc(config, fetcher = fetch) {
       return {
         sub: claims.sub,
         profile: {
+          // Membership comes only from the verified ID token, never request headers or profile input.
+          workspaceAdmin: Array.isArray(claims.groups) && claims.groups.every(group => typeof group === 'string') && claims.groups.includes('dyhs-admins'),
           name: typeof claims.name === 'string' ? claims.name.slice(0, 150) : 'Workspace 사용자',
           email: claims.email_verified === true && typeof claims.email === 'string' ? claims.email.slice(0, 254) : null,
           ...(config.mail?.mode === 'sso-auto' ? { mailboxClaim: typeof claims.workspace_mailbox === 'string' ? claims.workspace_mailbox : null } : {}),

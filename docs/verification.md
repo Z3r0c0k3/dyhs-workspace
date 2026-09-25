@@ -69,3 +69,11 @@
 - 임시 디렉터리의 초기 설정 생성, 키 생성/0600 권한, 필수 변수 검증, Compose config 검사 통과.
 
 Mailcow API 응답 형식은 공식 json_api.php와 functions.app_passwd.inc.php를 확인했습니다. 네트워크 인증·발급·메일 전송은 테스트 대역을 사용했으며 **운영 Authentik·Mailcow 계정으로 실제 송수신한 결과는 아닙니다**. 실제 배포의 claim·API 키·993/465 TLS 경로 검증은 실서비스 설치 문서 2–4절을 따릅니다.
+
+
+## 2026-09-26 Workspace 관리자 그룹
+
+- `dyhs-admins`를 포함한 서명된 OIDC claim으로 관리자 API 조회/생성이 허용되는 통합 테스트 통과. 일반 그룹, 다른 대소문자/접두사, Authentik 관리자 그룹만 있는 경우, 누락/잘못된 groups claim, 위조 헤더는 권한을 얻지 못함. 같은 sub가 그룹에서 빠진 뒤 재로그인하면 일반 사용자로 처리됨.
+- `npm run test:server`: 3개 통과, 기존 자동 메일 연결/IMAP/SMTP 회귀 검사 포함.
+- 운영 Docker 이미지 빌드와 roles.json 없는 비루트/읽기 전용 컨테이너 기동 검사 통과.
+- 실제 운영 Authentik 그룹/Provider 설정은 변경하지 않음. 기존 세션은 재로그인 필요, 그룹 제거의 기존 세션 반영 지연은 최대 15분.

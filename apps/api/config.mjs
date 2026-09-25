@@ -14,23 +14,11 @@ function https(value, name, originOnly = false) {
   return originOnly ? url.origin : url.href;
 }
 
-export function validatePolicy(policy) {
-  if (!policy || !Array.isArray(policy.subjects)) throw new Error('Policy requires a subjects array');
-  const seen = new Set();
-  for (const entry of policy.subjects) {
-    if (!entry || typeof entry.sub !== 'string' || !entry.sub || entry.sub.length > 255 || seen.has(entry.sub)
-      || !Array.isArray(entry.permissions) || entry.permissions.some(p => !permissions.includes(p))) throw new Error('Invalid or duplicate policy subject');
-    seen.add(entry.sub);
-  }
-  return policy;
-}
-
 export function loadConfig(env = process.env) {
   const publicUrl = https(required(env, 'WORKSPACE_PUBLIC_URL'), 'WORKSPACE_PUBLIC_URL', true);
   const issuer = https(required(env, 'OIDC_ISSUER'), 'OIDC_ISSUER');
   const authOrigin = https(required(env, 'AUTHENTIK_BASE_URL'), 'AUTHENTIK_BASE_URL', true);
   if (new URL(issuer).origin !== authOrigin) throw new Error('OIDC issuer must belong to AUTHENTIK_BASE_URL');
-  const policy = validatePolicy(JSON.parse(readFileSync(required(env, 'ROLE_MAPPING_PATH'), 'utf8')));
   const flows = {};
   for (const [name, variable] of Object.entries({ password: 'AUTHENTIK_PASSWORD_FLOW', passkey: 'AUTHENTIK_PASSKEY_FLOW', mfa: 'AUTHENTIK_MFA_FLOW' })) {
     const slug = env[variable]?.trim();
@@ -68,7 +56,7 @@ export function loadConfig(env = process.env) {
     }
   }
   return {
-    publicUrl, issuer, authOrigin, policy, flows, userPath, groupIds, port, mail,
+    publicUrl, issuer, authOrigin, flows, userPath, groupIds, port, mail,
     clientId: required(env, 'OIDC_CLIENT_ID'), clientSecret: required(env, 'OIDC_CLIENT_SECRET'),
     databaseUrl: required(env, 'DATABASE_URL'),
     apiToken: env.AUTHENTIK_API_TOKEN?.trim() || '',
@@ -78,6 +66,6 @@ export function loadConfig(env = process.env) {
   };
 }
 
-export function grants(config, sub) {
-  return config.policy.subjects.find(entry => entry.sub === sub)?.permissions || [];
+export function grants(session) {
+  return session.profile?.workspaceAdmin === true ? permissions : [];
 }

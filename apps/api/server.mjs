@@ -81,7 +81,7 @@ export function createApp({ config, store, oidc, identity, autoMail = config.mai
     req.session = id ? await store.session(id) : null;
     if (!req.session || req.session.issuer !== config.issuer) throw new HttpError(401, 'SESSION_EXPIRED', '다시 로그인해 주세요.');
     req.sessionId = id;
-    req.permissions = grants(config, req.session.sub);
+    req.permissions = grants(req.session);
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       if (req.headers.origin !== config.publicUrl || !equal(req.headers['x-csrf-token'], req.session.csrf)) throw new HttpError(403, 'CSRF_REJECTED', '요청을 확인하지 못했습니다. 페이지를 새로고침해 주세요.');
       if (!req.is('application/json')) throw new HttpError(415, 'JSON_REQUIRED', 'JSON 요청이 필요합니다.');
@@ -104,7 +104,7 @@ export function createApp({ config, store, oidc, identity, autoMail = config.mai
     id: digest(`${req.session.issuer}\n${req.session.sub}`), subject: req.session.sub,
     displayName: req.session.profile.name, email: req.session.profile.email,
     mailbox: connection.address, mailConnection: connection, mailAutoConnect: Boolean(autoMail),
-    roles: req.permissions.length ? ['user', 'identity_operator'] : ['user'], permissions: req.permissions,
+    roles: req.permissions.length ? ['user', 'workspace_admin'] : ['user'], permissions: req.permissions,
     csrfToken: req.session.csrf, sessionSeconds: config.sessionSeconds,
     capabilities: { mail: connection.state === 'active', mailSend: Boolean(config.mail?.writes && connection.state === 'active'), calendar: false, identity: Boolean(config.apiToken), identityWrites: Boolean(config.apiToken && config.adminWrites) },
     security: { ...config.flows, advanced: `${config.authOrigin}/if/user/#/settings` },

@@ -6,6 +6,8 @@ MAKE;가 운영하는 통합 작업 공간입니다. **Live 서버와 정적 미
 
 운영자가 최초 한 번 Authentik의 `workspace_mail` claim과 Mailcow API 키를 설정하면, 사용자는 SSO 로그인만으로 기존 본인 메일함에 들어갑니다. 사용자별 비밀번호 입력·수동 파일 등록은 필요 없습니다. 설정과 기존 설치 전환 절차는 실서비스 매뉴얼 2–3절에 있습니다.
 
+Workspace 관리자는 Authentik의 `dyhs-admins` 그룹으로 지정합니다. Provider의 기본 `profile` mapping과 ID token claim 포함을 활성화하면 재로그인 시 반영되며, 사용자별 `roles.json` 등록은 필요 없습니다.
+
 ## 실행
 
 아래 명령과 화면 설명은 **정적 미리보기 모드** 기준입니다. 해당 모드의 설치·SSH 접속·복구는 [미리보기 설치 매뉴얼](docs/installation.md)을 참고하세요. Live 빌드는 `npm run build:live`, 서버 실행은 설정 후 `npm start`입니다.

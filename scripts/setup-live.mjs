@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 const directory = new URL('../infra/secrets/', import.meta.url);
 await mkdir(directory, { recursive: true, mode: 0o700 });
 await chmod(directory, 0o700);
-for (const name of ['workspace.env', 'roles.json', 'mailboxes.json']) {
+for (const name of ['workspace.env', 'mailboxes.json']) {
   try { await access(new URL(name, directory)); throw new Error(`${name} already exists; existing configuration was not replaced`); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
@@ -30,8 +30,7 @@ MAILCOW_API_KEY=
 MAIL_ALLOWED_DOMAINS=
 MAIL_CREDENTIAL_KEY=${randomBytes(32).toString('hex')}
 `, { mode: 0o600, flag: 'wx' });
-// This file contains authorization rules, not passwords. Parent directory is private;
-// the unprivileged container must be able to read the bind-mounted file.
-await writeFile(new URL('roles.json', directory), '{"subjects":[]}\n', { mode: 0o644, flag: 'wx' });
+// The manual-mode file must be readable by the unprivileged container.
+// Keep the containing secrets directory private (0700).
 await writeFile(new URL('mailboxes.json', directory), '[]\n', { mode: 0o644, flag: 'wx' });
 console.log('Created infra/secrets configuration files. Keep this directory private. Set OIDC, Mailcow API key and allowed mail domains before starting. No secrets printed.');

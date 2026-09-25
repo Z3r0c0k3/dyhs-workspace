@@ -15,7 +15,6 @@ services:
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?Set OIDC_CLIENT_ID}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?Set OIDC_CLIENT_SECRET}
       DATABASE_URL: postgresql://workspace:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/workspace
-      ROLE_MAPPING_PATH: /run/secrets/roles.json
       AUTHENTIK_BASE_URL: ${AUTHENTIK_BASE_URL:-https://sso.dyhs.kr}
       AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN:-}
       AUTHENTIK_USER_PATH: ${AUTHENTIK_USER_PATH:-}
@@ -34,7 +33,6 @@ services:
       MAIL_CREDENTIAL_KEY: ${MAIL_CREDENTIAL_KEY:-}
       MAIL_ALLOWED_DOMAINS: ${MAIL_ALLOWED_DOMAINS:-}
     volumes:
-      - ../secrets/roles.json:/run/secrets/roles.json:ro
       - ../secrets/mailboxes.json:/run/secrets/mailboxes.json:ro
     read_only: true
     tmpfs: ["/tmp:size=16m,mode=1777"]
